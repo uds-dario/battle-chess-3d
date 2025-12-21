@@ -1,0 +1,141 @@
+{
+  "version": 1,
+  "defaults": {
+    "scale": {
+      "white": 0.8,
+      "black": 0.8
+    },
+    "colors": {
+      "white": "#ffffff",
+      "black": "#999999"
+    },
+    "roughness": {
+      "white": 0.9,
+      "black": 0.4
+    },
+    "metalness": {
+      "white": 0.0,
+      "black": 0.2
+    },
+    "materials": {
+      "white": {
+        "roughness": 0.9,
+        "metalness": 0.0
+      },
+      "black": {
+        "roughness": 0.8,
+        "metalness": 0.8
+      }
+    }
+  },
+  "overrides": {
+    "pawn": {
+      "scale": {
+        "white": 0.5,
+        "black": 0.5
+      },
+      "colors": {
+        "white": "#ffffff",
+        "black": "#999999"
+      },
+      "roughness": {
+        "white": 0.9,
+        "black": 0.4
+      },
+      "metalness": {
+        "white": 0.0,
+        "black": 0.2
+      }
+    },
+    "rook": {
+      "scale": {
+        "white": 0.8,
+        "black": 1.0
+      },
+      "colors": {
+        "white": "#ffffff",
+        "black": "#999999"
+      },
+      "roughness": {
+        "white": 0.9,
+        "black": 0.4
+      },
+      "metalness": {
+        "white": 0.0,
+        "black": 0.2
+      }
+    },
+    "knight": {
+      "scale": {
+        "white": 0.9,
+        "black": 0.85
+      },
+      "colors": {
+        "white": "#ffffff",
+        "black": "#999999"
+      },
+      "roughness": {
+        "white": 0.9,
+        "black": 0.4
+      },
+      "metalness": {
+        "white": 0.0,
+        "black": 0.2
+      }
+    },
+    "bishop": {
+      "scale": {
+        "white": 0.7,
+        "black": 1.0
+      },
+      "colors": {
+        "white": "#ffffff",
+        "black": "#999999"
+      },
+      "roughness": {
+        "white": 0.9,
+        "black": 1.0
+      },
+      "metalness": {
+        "white": 0.0,
+        "black": 0.5
+      }
+    },
+    "queen": {
+      "scale": {
+        "white": 0.9,
+        "black": 0.8
+      },
+      "colors": {
+        "white": "#ffffff",
+        "black": "#999999"
+      },
+      "roughness": {
+        "white": 0.9,
+        "black": 0.4
+      },
+      "metalness": {
+        "white": 0.0,
+        "black": 0.2
+      }
+    },
+    "king": {
+      "scale": {
+        "white": 0.8,
+        "black": 0.9
+      },
+      "colors": {
+        "white": "#ffffff",
+        "black": "#999999"
+      },
+      "roughness": {
+        "white": 0.9,
+        "black": 0.4
+      },
+      "metalness": {
+        "white": 0.0,
+        "black": 0.2
+      }
+    }
+  }
+}

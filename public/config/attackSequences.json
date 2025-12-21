@@ -1,0 +1,32 @@
+{
+  "version": 1,
+  "defaults": {
+    "attack": [
+      { "target": "attacker", "clip": "attack", "at": 0 },
+      { "target": "victim", "clip": "hit", "at": 200 },
+      { "target": "victim", "clip": "die", "at": 600 }
+    ]
+  },
+  "overrides": {
+    "pawn": {
+      "pawn": [
+        { "target": "attacker", "clip": "attack", "at": 0, "move": true, "speed": 0.2 },
+        { "target": "victim", "clip": "die", "at": 900 }
+      ],
+      "knight": [
+        { "target": "attacker", "clip": "attack", "at": 0, "move": true, "speed": 0.2 },
+        { "target": "victim", "clip": "hit", "at": 800 },
+        { "target": "attacker", "clip": "attack", "at": 1900 },
+        { "target": "victim", "clip": "hit", "at": 2400 },
+        { "target": "attacker", "clip": "attack2", "at": 3400, "move": true, "speed": 0.2 },
+        { "target": "victim", "clip": "die", "at": 4900 }
+      ]
+    },
+    "knight": {
+      "pawn": [
+        { "target": "attacker", "clip": "attack", "at": 0, "move": true, "speed": 0.4 },
+        { "target": "victim", "clip": "die", "at": 1500 }
+      ]
+    }
+  }
+}

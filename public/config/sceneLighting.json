@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "rimLight": {
+    "enabled": true,
+    "color": "#7aa7ff",
+    "intensity": 0.85,
+    "position": { "x": 8, "y": 6, "z": -10 },
+    "helper": true
+  }
+}
