@@ -17,6 +17,12 @@ type ScaleOverride =
 type ChannelOverride =
   | number
   | Partial<Record<PieceColorName, number | null | undefined>>
+type MoveSpeedOverride =
+  | number
+  | Partial<Record<PieceColorName, number | null | undefined>>
+type AnimationTimeScaleOverride =
+  | number
+  | Partial<Record<PieceColorName, number | null | undefined>>
 type MaterialOverride = Partial<
   Record<
     PieceColorName,
@@ -37,6 +43,8 @@ export type PieceAttributesConfig = {
     materials?: MaterialOverride
     roughness?: ChannelOverride
     metalness?: ChannelOverride
+    moveSpeed?: MoveSpeedOverride
+    animationTimeScale?: AnimationTimeScaleOverride
   }
   overrides?: Partial<
     Record<
@@ -47,6 +55,8 @@ export type PieceAttributesConfig = {
         materials?: MaterialOverride
         roughness?: ChannelOverride
         metalness?: ChannelOverride
+        moveSpeed?: MoveSpeedOverride
+        animationTimeScale?: AnimationTimeScaleOverride
       }
     >
   >
@@ -98,6 +108,56 @@ function readScaleValue(
   return null
 }
 
+function resolveMoveSpeed(
+  overrideMoveSpeed: MoveSpeedOverride | undefined,
+  defaultMoveSpeed: MoveSpeedOverride | undefined,
+  color?: PieceColorName
+) {
+  const overrideValue = readMoveSpeedValue(overrideMoveSpeed, color)
+  if (overrideValue !== null) return overrideValue
+  const defaultValue = readMoveSpeedValue(defaultMoveSpeed, color)
+  if (defaultValue !== null) return defaultValue
+  return null
+}
+
+function readMoveSpeedValue(
+  moveSpeed: MoveSpeedOverride | undefined,
+  color?: PieceColorName
+) {
+  if (typeof moveSpeed === 'number' && Number.isFinite(moveSpeed)) {
+    return moveSpeed
+  }
+  if (moveSpeed && typeof moveSpeed === 'object' && color) {
+    const value = moveSpeed[color]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return null
+}
+
+function resolveAnimationTimeScale(
+  overrideScale: AnimationTimeScaleOverride | undefined,
+  defaultScale: AnimationTimeScaleOverride | undefined,
+  color?: PieceColorName
+) {
+  const overrideValue = readAnimationTimeScaleValue(overrideScale, color)
+  if (overrideValue !== null) return overrideValue
+  const defaultValue = readAnimationTimeScaleValue(defaultScale, color)
+  if (defaultValue !== null) return defaultValue
+  return null
+}
+
+function readAnimationTimeScaleValue(
+  scale: AnimationTimeScaleOverride | undefined,
+  color?: PieceColorName
+) {
+  if (typeof scale === 'number' && Number.isFinite(scale)) return scale
+  if (scale && typeof scale === 'object' && color) {
+    const value = scale[color]
+    if (typeof value === 'number' && Number.isFinite(value)) return value
+  }
+  return null
+}
+
 function resolveChannel(
   overrideChannel: ChannelOverride | undefined,
   defaultChannel: ChannelOverride | undefined,
@@ -127,6 +187,27 @@ export function getPieceScaleForColor(type: PieceType, color: PieceColorName) {
   const overrideScale = currentConfig?.overrides?.[pieceName]?.scale
   const defaultScale = currentConfig?.defaults?.scale
   return resolveScale(overrideScale, defaultScale, color)
+}
+
+export function getPieceMoveSpeedForColor(
+  type: PieceType,
+  color: PieceColorName
+) {
+  const pieceName = typeToName[type]
+  const overrideMoveSpeed = currentConfig?.overrides?.[pieceName]?.moveSpeed
+  const defaultMoveSpeed = currentConfig?.defaults?.moveSpeed
+  return resolveMoveSpeed(overrideMoveSpeed, defaultMoveSpeed, color)
+}
+
+export function getPieceAnimationTimeScaleForColor(
+  type: PieceType,
+  color: PieceColorName
+) {
+  const pieceName = typeToName[type]
+  const overrideScale =
+    currentConfig?.overrides?.[pieceName]?.animationTimeScale
+  const defaultScale = currentConfig?.defaults?.animationTimeScale
+  return resolveAnimationTimeScale(overrideScale, defaultScale, color)
 }
 
 function parseColorValue(value: string | number | null | undefined) {

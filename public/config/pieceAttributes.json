@@ -26,10 +26,18 @@
         "roughness": 0.8,
         "metalness": 0.8
       }
+    },
+    "animationTimeScale": {
+      "white": 1.0,
+      "black": 1.5
     }
   },
   "overrides": {
     "pawn": {
+      "moveSpeed": {
+        "white": 1.5,
+        "black": 0.9
+      },
       "scale": {
         "white": 0.5,
         "black": 0.5
@@ -48,6 +56,10 @@
       }
     },
     "rook": {
+      "moveSpeed": {
+        "white": 4.0,
+        "black": 3.9
+      },
       "scale": {
         "white": 0.8,
         "black": 1.0
@@ -66,6 +78,10 @@
       }
     },
     "knight": {
+      "moveSpeed": {
+        "white": 1.5,
+        "black": 1.1
+      },
       "scale": {
         "white": 0.9,
         "black": 0.85
@@ -84,6 +100,10 @@
       }
     },
     "bishop": {
+      "moveSpeed": {
+        "white": 4.3,
+        "black": 4.1
+      },
       "scale": {
         "white": 0.7,
         "black": 1.0
@@ -102,6 +122,10 @@
       }
     },
     "queen": {
+      "moveSpeed": {
+        "white": 4.0,
+        "black": 3.9
+      },
       "scale": {
         "white": 0.9,
         "black": 0.8
@@ -120,6 +144,10 @@
       }
     },
     "king": {
+      "moveSpeed": {
+        "white": 3.8,
+        "black": 3.6
+      },
       "scale": {
         "white": 0.8,
         "black": 0.9

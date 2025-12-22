@@ -6,6 +6,7 @@ import { boardToWorld, TILE_HEIGHT } from './board'
 import {
   getPieceColorOverride,
   getPieceMaterialOverrides,
+  getPieceAnimationTimeScaleForColor,
   getPieceScaleForColor,
 } from '../game/pieceAttributes'
 import { TUNING } from '../config/tuning'
@@ -250,7 +251,9 @@ export function createPieceEntity(
     actions.idle.play()
     actions.idle.time = idleOffset
     actions.idle.paused = false
-    actions.idle.setEffectiveTimeScale(1)
+    const idleTimeScale =
+      getPieceAnimationTimeScaleForColor(type, colorKey) ?? 1
+    actions.idle.setEffectiveTimeScale(idleTimeScale)
     actions.idle.setEffectiveWeight(1)
   }
 

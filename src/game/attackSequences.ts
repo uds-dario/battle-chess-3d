@@ -8,6 +8,8 @@ export type PieceName =
   | 'queen'
   | 'king'
 
+export type PieceColorName = 'white' | 'black'
+
 export type AttackSequenceStep = {
   target: 'attacker' | 'victim'
   clip: string
@@ -16,12 +18,19 @@ export type AttackSequenceStep = {
   speed?: number
 }
 
+export type AttackSequenceColorOverrides = Partial<
+  Record<
+    PieceColorName,
+    Partial<Record<PieceName, Partial<Record<PieceName, AttackSequenceStep[]>>>>
+  >
+>
+
 export type AttackSequencesConfig = {
   version: number
   defaults?: {
     attack: AttackSequenceStep[]
   }
-  overrides?: Partial<Record<PieceName, Partial<Record<PieceName, AttackSequenceStep[]>>>>
+  sequences?: AttackSequenceColorOverrides
 }
 
 const typeToName: Record<PieceType, PieceName> = {
@@ -41,11 +50,14 @@ export function setAttackSequences(config: AttackSequencesConfig) {
 
 export function getAttackSequence(
   attackerType: PieceType,
-  victimType: PieceType
+  victimType: PieceType,
+  attackerColor: PieceColorName
 ): AttackSequenceStep[] {
   const attacker = typeToName[attackerType]
   const victim = typeToName[victimType]
-  const override = currentConfig?.overrides?.[attacker]?.[victim]
+  const override = currentConfig?.sequences?.[attackerColor]?.[attacker]?.[
+    victim
+  ]
   if (override) return override
   const defaults = currentConfig?.defaults?.attack ?? []
   console.log(

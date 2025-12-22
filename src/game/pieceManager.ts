@@ -14,6 +14,10 @@ import {
   type AttackSequenceStep,
   type PieceName,
 } from './attackSequences'
+import {
+  getPieceAnimationTimeScaleForColor,
+  getPieceMoveSpeedForColor,
+} from './pieceAttributes'
 import { boardToWorld, TILE_HEIGHT } from '../render/board'
 
 type MoveOptions = {
@@ -45,7 +49,7 @@ function coordsFromSquare(square: string) {
 const FADE_DURATION = 0.15
 const ROTATION_SPEED = 6
 const DEFAULT_ANIMATION_TIME_SCALE = 1
-const baseLoopClips = new Set(['walk', 'idle'])
+const baseLoopClips = new Set(['walk', 'idle', 'move'])
 const nameToType: Record<PieceName, PieceType> = {
   pawn: 'p',
   rook: 'r',
@@ -71,7 +75,7 @@ function transitionAction(
   if (!action) return 0
   action.reset()
   action.enabled = true
-  action.setEffectiveTimeScale(getAnimationTimeScale())
+  action.setEffectiveTimeScale(getAnimationTimeScale(entity))
   if (loopOnce) {
     action.setLoop(THREE.LoopOnce, 1)
     action.clampWhenFinished = true
@@ -98,6 +102,7 @@ function resolveAction(
   if (name === 'attack') return entity.actions.attack
   if (name === 'ready') return entity.actions.ready
   if (name === 'walk') return entity.actions.walk
+  if (name === 'move') return entity.actions.walk
   if (name === 'idle') return entity.actions.idle
   if (name === 'hit') {
     return attackerType
@@ -128,6 +133,7 @@ function shouldLoopOnce(clipName: string) {
   const name = clipName.toLowerCase()
   if (baseLoopClips.has(name)) return false
   if (name.startsWith('walk')) return false
+  if (name.startsWith('move')) return false
   if (name.startsWith('idle')) return false
   return true
 }
@@ -164,7 +170,13 @@ function scheduleSequence(
     if (!action) return
     const loopOnce = shouldLoopOnce(step.clip)
     setTimeout(() => {
+      if (step.target === 'attacker' && !step.move) {
+        stopPieceMove(attacker)
+      }
       transitionAction(targetEntity, action, { loopOnce })
+      if (step.target === 'attacker') {
+        targetEntity.state = 'attacking'
+      }
     }, step.at)
     const durationMs = action.getClip().duration * 1000
     sequenceEndMs = Math.max(sequenceEndMs, step.at + durationMs)
@@ -210,7 +222,11 @@ const moveSpeedEnvMap: Record<PieceType, string> = {
   k: 'VITE_PIECE_MOVE_SPEED_KING',
 }
 
-function getMoveSpeed(type: PieceType) {
+function getMoveSpeedForColor(type: PieceType, color?: Color) {
+  const colorName = color === 'w' ? 'white' : color === 'b' ? 'black' : undefined
+  const configSpeed =
+    colorName !== undefined ? getPieceMoveSpeedForColor(type, colorName) : null
+  if (typeof configSpeed === 'number') return configSpeed
   const key = moveSpeedEnvMap[type]
   const raw = import.meta.env[key]
   const parsed = Number.parseFloat(raw ?? '')
@@ -221,10 +237,19 @@ function getRotationSpeed() {
   return ROTATION_SPEED
 }
 
-function getAnimationTimeScale() {
+function getAnimationTimeScale(entity: PieceEntity) {
   const raw = import.meta.env.VITE_ANIMATION_TIME_SCALE
   const parsed = Number.parseFloat(raw ?? '')
-  return parsed > 0 ? parsed : DEFAULT_ANIMATION_TIME_SCALE
+  const baseScale = parsed > 0 ? parsed : DEFAULT_ANIMATION_TIME_SCALE
+  const colorName = entity.color === 'w' ? 'white' : 'black'
+  const configScale = getPieceAnimationTimeScaleForColor(
+    entity.type,
+    colorName
+  )
+  if (typeof configScale === 'number' && configScale > 0) {
+    return baseScale * configScale
+  }
+  return baseScale
 }
 
 function rotateTowards(
@@ -320,7 +345,9 @@ export function movePieceEntity(
   const applyMove = (clipName?: string | null, speedOverride?: number | null) => {
     rotateTowards(piece, target, true)
     const speed =
-      typeof speedOverride === 'number' ? speedOverride : getMoveSpeed(piece.type)
+      typeof speedOverride === 'number'
+        ? speedOverride
+        : getMoveSpeedForColor(piece.type, piece.color)
     setPieceMove(piece, target, speed)
     piece.boardPos = { file: toFile, rank: toRank }
     piece.root.userData.boardPos = { file: toFile, rank: toRank }
@@ -352,12 +379,13 @@ export function movePieceEntity(
     if (victim.actions.ready) {
       transitionAction(victim, victim.actions.ready, { loopOnce: true })
     }
-    const steps = getAttackSequence(piece.type, victim.type)
+    const attackerColor = piece.color === 'w' ? 'white' : 'black'
+    const steps = getAttackSequence(piece.type, victim.type, attackerColor)
     const { victimEndMs, moveSteps } = scheduleSequence(
       steps,
       piece,
       victim,
-      getMoveSpeed(piece.type)
+      getMoveSpeedForColor(piece.type, piece.color)
     )
     const removalDelay = Math.max(victimEndMs, 300)
     setTimeout(() => {
@@ -378,7 +406,7 @@ export function movePieceEntity(
           const speed =
             typeof step.speed === 'number'
               ? step.speed
-              : getMoveSpeed(piece.type)
+              : getMoveSpeedForColor(piece.type, piece.color)
           if (step.loop) {
             rotateTowards(piece, target, true)
           }
