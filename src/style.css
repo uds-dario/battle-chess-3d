@@ -83,6 +83,11 @@ h1 {
   box-shadow: 0 18px 48px rgba(0, 0, 0, 0.35);
 }
 
+.preloader-detail {
+  font-size: 0.85rem;
+  color: rgba(232, 238, 252, 0.8);
+}
+
 .preloader-spinner {
   width: 28px;
   height: 28px;

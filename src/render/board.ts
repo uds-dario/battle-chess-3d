@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { TUNING } from '../config/tuning'
 
 export const TILE_SIZE = 1
 export const TILE_HEIGHT = 0.2
@@ -19,22 +20,18 @@ export function createBoard(scene: THREE.Scene): BoardTile[] {
   const tiles: BoardTile[] = []
   const lightColor = new THREE.Color(0xe8dfd0)
   const darkColor = new THREE.Color(0x7a6046)
+  const geometry = new THREE.BoxGeometry(TILE_SIZE, TILE_HEIGHT, TILE_SIZE)
+  const lightMaterial = new THREE.MeshStandardMaterial({ color: lightColor })
+  const darkMaterial = new THREE.MeshStandardMaterial({ color: darkColor })
 
   for (let rank = 0; rank < 8; rank += 1) {
     for (let file = 0; file < 8; file += 1) {
-      const geometry = new THREE.BoxGeometry(
-        TILE_SIZE,
-        TILE_HEIGHT,
-        TILE_SIZE
-      )
       const isLight = (file + rank) % 2 === 0
-      const material = new THREE.MeshStandardMaterial({
-        color: isLight ? lightColor : darkColor,
-      })
+      const material = isLight ? lightMaterial : darkMaterial
       const tile = new THREE.Mesh(geometry, material) as BoardTile
       const position = boardToWorld(file, rank)
       tile.position.copy(position)
-      tile.receiveShadow = true
+      tile.receiveShadow = TUNING.tileReceiveShadow
       tile.userData.isTile = true
       tile.userData.boardPos = { file, rank }
       ;(tile as any).boardPos = { file, rank }

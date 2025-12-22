@@ -2,12 +2,14 @@ import './style.css'
 import * as THREE from 'three'
 import { WebGPURenderer } from 'three/webgpu'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import Stats from 'three/examples/jsm/libs/stats.module.js'
 import { ChessEngine } from './game/chessEngine'
 import { loadAttackSequences } from './game/attackSequences'
 import { loadPieceAttributes } from './game/pieceAttributes'
 import { createBoard, TILE_HEIGHT, TILE_SIZE } from './render/board'
 import { loadCharacterAssets } from './render/characterLoader'
 import { getRimLightConfig, loadSceneLighting } from './render/sceneLighting'
+import { TUNING } from './config/tuning'
 import {
   getPieceAtSquare,
   getPieceById,
@@ -25,6 +27,7 @@ type Preloader = {
   show: () => void
   hide: () => void
   setText: (text: string) => void
+  setDetail: (text: string) => void
 }
 
 function createPreloader(): Preloader {
@@ -34,10 +37,14 @@ function createPreloader(): Preloader {
     <div class="preloader-card">
       <div class="preloader-spinner" aria-hidden="true"></div>
       <div class="preloader-text">Loading...</div>
+      <div class="preloader-detail"></div>
     </div>
   `
   appRoot.appendChild(overlay)
   const textEl = overlay.querySelector('.preloader-text') as HTMLDivElement | null
+  const detailEl = overlay.querySelector(
+    '.preloader-detail'
+  ) as HTMLDivElement | null
   return {
     show: () => {
       overlay.classList.remove('is-hidden')
@@ -47,6 +54,9 @@ function createPreloader(): Preloader {
     },
     setText: (text: string) => {
       if (textEl) textEl.textContent = text
+    },
+    setDetail: (text: string) => {
+      if (detailEl) detailEl.textContent = text
     },
   }
 }
@@ -75,23 +85,23 @@ async function createRenderer(target: HTMLCanvasElement) {
 
   if (hasWebGPU) {
     const renderer = new WebGPURenderer({
-      antialias: true,
+      antialias: TUNING.antialias,
       canvas: target,
     })
     await renderer.init()
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
-    renderer.shadowMap.enabled = true
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, TUNING.maxPixelRatio))
+    renderer.shadowMap.enabled = TUNING.enableShadows
     return renderer
   }
 
   const renderer = new THREE.WebGLRenderer({
-    antialias: true,
+    antialias: TUNING.antialias,
     canvas: target,
   })
   renderer.setSize(window.innerWidth, window.innerHeight)
-  renderer.setPixelRatio(window.devicePixelRatio)
-  renderer.shadowMap.enabled = true
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, TUNING.maxPixelRatio))
+  renderer.shadowMap.enabled = TUNING.enableShadows
   return renderer
 }
 
@@ -145,10 +155,12 @@ async function init() {
 
   const dirLight = new THREE.DirectionalLight(0xffffff, 1)
   dirLight.position.set(6, 10, 8)
-  dirLight.castShadow = true
-  dirLight.shadow.mapSize.set(1024, 1024)
-  dirLight.shadow.camera.near = 0.5
-  dirLight.shadow.camera.far = 50
+  dirLight.castShadow = TUNING.enableShadows
+  if (TUNING.enableShadows) {
+    dirLight.shadow.mapSize.set(TUNING.shadowMapSize, TUNING.shadowMapSize)
+    dirLight.shadow.camera.near = 0.5
+    dirLight.shadow.camera.far = 50
+  }
   scene.add(dirLight)
 
   if (rimLightConfig.enabled) {
@@ -178,25 +190,47 @@ async function init() {
   const highlightMaterial = new THREE.MeshStandardMaterial({
     color: 0x4cc9f0,
     transparent: true,
-    opacity: 0.35,
+    opacity: TUNING.highlightOpacity,
   })
-  boardTiles.forEach((tile) => {
-    const overlay = new THREE.Mesh(
-      new THREE.BoxGeometry(TILE_SIZE, 0.03, TILE_SIZE),
-      highlightMaterial.clone()
-    )
-    overlay.position.y = TILE_HEIGHT / 2 + 0.02
-    overlay.visible = false
-    overlay.userData.isHighlight = true
-    overlay.raycast = () => null
-    tile.add(overlay)
-    tile.userData.highlight = overlay
+  const highlightMesh = new THREE.InstancedMesh(
+    new THREE.BoxGeometry(TILE_SIZE, TUNING.highlightHeight, TILE_SIZE),
+    highlightMaterial,
+    boardTiles.length
+  )
+  highlightMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
+  highlightMesh.castShadow = false
+  highlightMesh.receiveShadow = false
+  highlightMesh.raycast = () => null
+  scene.add(highlightMesh)
+  const hiddenHighlightMatrix = new THREE.Matrix4().makeScale(0, 0, 0)
+  const highlightMatrix = new THREE.Matrix4()
+  boardTiles.forEach((tile, index) => {
+    tile.userData.highlightIndex = index
+    highlightMesh.setMatrixAt(index, hiddenHighlightMatrix)
   })
+  highlightMesh.instanceMatrix.needsUpdate = true
+
+  const setHighlightVisible = (tile: THREE.Object3D, visible: boolean) => {
+    const index = tile.userData.highlightIndex as number | undefined
+    if (index === undefined) return
+    if (!visible) {
+      highlightMesh.setMatrixAt(index, hiddenHighlightMatrix)
+      return
+    }
+    const y = tile.position.y + TILE_HEIGHT / 2 + TUNING.highlightOffset
+    highlightMatrix.makeTranslation(tile.position.x, y, tile.position.z)
+    highlightMesh.setMatrixAt(index, highlightMatrix)
+  }
 
   const engine = new ChessEngine()
   preloader.setText('Loading assets...')
-  const characterAssets = await loadCharacterAssets()
+  preloader.setDetail('Preparing character assets...')
+  const characterAssets = await loadCharacterAssets((label) => {
+    preloader.setDetail(label)
+  })
+  preloader.setDetail('Loading attack sequences...')
   await loadAttackSequences()
+  preloader.setDetail('Loading piece attributes...')
   await loadPieceAttributes()
   initPieces(scene, engine, characterAssets)
   preloader.hide()
@@ -208,9 +242,9 @@ async function init() {
 
   const clearHighlights = () => {
     boardTiles.forEach((tile) => {
-      const overlay = tile.userData.highlight as THREE.Mesh | undefined
-      if (overlay) overlay.visible = false
+      setHighlightVisible(tile, false)
     })
+    highlightMesh.instanceMatrix.needsUpdate = true
   }
 
   const showLegalMoves = (fromFile: number, fromRank: number) => {
@@ -224,9 +258,9 @@ async function init() {
           candidate.userData.boardPos?.file === file &&
           candidate.userData.boardPos?.rank === rank
       )
-      const overlay = tile?.userData.highlight as THREE.Mesh | undefined
-      if (overlay) overlay.visible = true
+      if (tile) setHighlightVisible(tile, true)
     })
+    highlightMesh.instanceMatrix.needsUpdate = true
   }
 
   const clearSelection = () => {
@@ -324,21 +358,31 @@ async function init() {
 
   renderer.domElement.addEventListener('pointerdown', handlePointerDown)
 
+  const stats = TUNING.showStats ? new Stats() : null
+  if (stats) {
+    stats.dom.style.position = 'fixed'
+    stats.dom.style.top = '12px'
+    stats.dom.style.left = '12px'
+    appRoot.appendChild(stats.dom)
+  }
+
   const handleResize = () => {
     camera.aspect = window.innerWidth / window.innerHeight
     camera.updateProjectionMatrix()
     renderer.setSize(window.innerWidth, window.innerHeight)
-    renderer.setPixelRatio(window.devicePixelRatio)
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, TUNING.maxPixelRatio))
   }
 
   window.addEventListener('resize', handleResize)
 
   const animate = () => {
+    if (stats) stats.begin()
     requestAnimationFrame(animate)
     const deltaTime = clock.getDelta()
     updatePieceEntities(deltaTime)
     controls.update()
     renderer.render(scene, camera)
+    if (stats) stats.end()
   }
 
   animate()

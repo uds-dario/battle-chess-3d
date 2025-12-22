@@ -17,8 +17,13 @@ export type CharacterAssets = {
 const loader = new GLTFLoader()
 let assetsPromise: Promise<CharacterAssets> | null = null
 
-async function loadModel(url: string) {
+async function loadModel(
+  url: string,
+  label?: string,
+  onProgress?: (label: string) => void
+) {
   try {
+    if (label && onProgress) onProgress(label)
     const gltf = await loader.loadAsync(url)
     return gltf.scene
   } catch (error) {
@@ -27,8 +32,13 @@ async function loadModel(url: string) {
   }
 }
 
-async function loadClips(url: string) {
+async function loadClips(
+  url: string,
+  label?: string,
+  onProgress?: (label: string) => void
+) {
   try {
+    if (label && onProgress) onProgress(label)
     const gltf = await loader.loadAsync(url)
     return gltf.animations
   } catch (error) {
@@ -39,13 +49,34 @@ async function loadClips(url: string) {
 
 const pieceTypes: PieceType[] = ['p', 'r', 'n', 'b', 'q', 'k']
 
+function pieceLabel(type: PieceType) {
+  switch (type) {
+    case 'p':
+      return 'pawn'
+    case 'r':
+      return 'rook'
+    case 'n':
+      return 'knight'
+    case 'b':
+      return 'bishop'
+    case 'q':
+      return 'queen'
+    case 'k':
+      return 'king'
+    default:
+      return type
+  }
+}
+
 async function loadTemplatesFor(
-  color: 'white' | 'black'
+  color: 'white' | 'black',
+  onProgress?: (label: string) => void
 ): Promise<Record<PieceType, THREE.Object3D>> {
   const entries = await Promise.all(
     pieceTypes.map(async (type) => {
       const url = CHARACTER_DEFS[color].models[type]
-      const model = await loadModel(url)
+      const label = `${color} ${pieceLabel(type)} model`
+      const model = await loadModel(url, label, onProgress)
       return [type, model] as const
     })
   )
@@ -54,21 +85,29 @@ async function loadTemplatesFor(
 
 async function loadClipsForType(
   color: 'white' | 'black',
-  type: PieceType
+  type: PieceType,
+  onProgress?: (label: string) => void
 ): Promise<[PieceType, THREE.AnimationClip[]]> {
   const url = CHARACTER_DEFS.animations[color][type]
-  const clips = await loadClips(url)
+  const label = `${color} ${pieceLabel(type)} animations`
+  const clips = await loadClips(url, label, onProgress)
   return [type, clips]
 }
 
-export function loadCharacterAssets(): Promise<CharacterAssets> {
+export function loadCharacterAssets(
+  onProgress?: (label: string) => void
+): Promise<CharacterAssets> {
   if (assetsPromise) return assetsPromise
 
   assetsPromise = Promise.all([
-    loadTemplatesFor('white'),
-    loadTemplatesFor('black'),
-    Promise.all(pieceTypes.map((type) => loadClipsForType('white', type))),
-    Promise.all(pieceTypes.map((type) => loadClipsForType('black', type))),
+    loadTemplatesFor('white', onProgress),
+    loadTemplatesFor('black', onProgress),
+    Promise.all(
+      pieceTypes.map((type) => loadClipsForType('white', type, onProgress))
+    ),
+    Promise.all(
+      pieceTypes.map((type) => loadClipsForType('black', type, onProgress))
+    ),
   ]).then(([whiteModels, blackModels, whiteClipEntries, blackClipEntries]) => ({
     templates: {
       white: whiteModels,

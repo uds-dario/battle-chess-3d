@@ -8,6 +8,7 @@ import {
   getPieceMaterialOverrides,
   getPieceScaleForColor,
 } from '../game/pieceAttributes'
+import { TUNING } from '../config/tuning'
 
 export type PieceEntity = {
   id: string
@@ -87,7 +88,8 @@ function ensureUniqueMaterials(root: THREE.Object3D) {
     } else if (child.material) {
       child.material = child.material.clone()
     }
-    child.castShadow = true
+    child.castShadow = TUNING.pieceCastShadow
+    child.receiveShadow = TUNING.pieceReceiveShadow
   })
 }
 
@@ -280,6 +282,21 @@ export function createPieceEntity(
 
 export function updatePieceEntities(deltaTime: number) {
   for (const entity of entities) {
+    const shouldPauseIdle =
+      TUNING.pauseIdleAnimationWhenStationary &&
+      entity.state === 'idle' &&
+      !entity.moveTarget &&
+      !entity.rotationTarget
+    if (entity.activeAction) {
+      if (shouldPauseIdle) {
+        entity.activeAction.paused = true
+      } else if (entity.activeAction.paused) {
+        entity.activeAction.paused = false
+      }
+    }
+    if (shouldPauseIdle) {
+      continue
+    }
     if (entity.moveTarget && entity.moveSpeed) {
       const current = entity.root.position
       const toTarget = new THREE.Vector3().subVectors(
