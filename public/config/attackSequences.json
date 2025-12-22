@@ -41,8 +41,8 @@
       "knight": {
         "pawn": [
           { "target": "attacker", "clip": "walk", "at": 0, "move": true, "speed": 1.1 },
-          { "target": "attacker", "clip": "attack", "at": 1100 },
-          { "target": "victim", "clip": "die", "at": 1800 }
+          { "target": "attacker", "clip": "attack2", "at": 900 },
+          { "target": "victim", "clip": "die", "at": 1500, "move": true, "speed": -0.5 }
         ]
       }
     }
