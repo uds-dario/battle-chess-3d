@@ -28,14 +28,14 @@
       }
     },
     "animationTimeScale": {
-      "white": 1.0,
-      "black": 1.5
+      "white": 0.5,
+      "black": 1.0
     }
   },
   "overrides": {
     "pawn": {
       "moveSpeed": {
-        "white": 1.5,
+        "white": 1.0,
         "black": 0.9
       },
       "scale": {
@@ -57,8 +57,8 @@
     },
     "rook": {
       "moveSpeed": {
-        "white": 4.0,
-        "black": 3.9
+        "white": 1.2,
+        "black": 1.2
       },
       "scale": {
         "white": 0.8,
@@ -79,7 +79,7 @@
     },
     "knight": {
       "moveSpeed": {
-        "white": 1.5,
+        "white": 1.0,
         "black": 1.1
       },
       "scale": {

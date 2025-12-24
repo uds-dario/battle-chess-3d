@@ -67,6 +67,8 @@ const typeToName: Record<PieceType, PieceName> = {
   k: 'king',
 }
 
+const slidingAttackers = new Set<PieceType>(['r', 'b', 'q'])
+
 function transitionAction(
   entity: PieceEntity,
   action?: THREE.AnimationAction,
@@ -99,6 +101,8 @@ function resolveAction(
   attackerType?: PieceType
 ) {
   const name = clipName.toLowerCase()
+  const namedAction = entity.namedActions?.[name]
+  if (namedAction) return namedAction
   if (name === 'attack') return entity.actions.attack
   if (name === 'ready') return entity.actions.ready
   if (name === 'walk') return entity.actions.walk
@@ -124,8 +128,6 @@ function resolveAction(
     const type = nameToType[attackerName]
     return type ? entity.actions.dieFrom?.[type] ?? entity.actions.die : undefined
   }
-  const namedAction = entity.namedActions?.[name]
-  if (namedAction) return namedAction
   return undefined
 }
 
@@ -167,7 +169,16 @@ function scheduleSequence(
     }
     const targetEntity = step.target === 'attacker' ? attacker : victim
     const action = resolveAction(targetEntity, step.clip, attacker.type)
-    if (!action) return
+    if (!action) {
+      console.log(
+        `[anims] Missing clip "${step.clip}" for ${step.target} (${typeToName[targetEntity.type]})`
+      )
+      sequenceEndMs = Math.max(sequenceEndMs, step.at)
+      if (step.target === 'victim') {
+        victimEndMs = Math.max(victimEndMs, step.at)
+      }
+      return
+    }
     const loopOnce = shouldLoopOnce(step.clip)
     setTimeout(() => {
       if (step.target === 'attacker' && !step.move) {
@@ -342,6 +353,12 @@ export function movePieceEntity(
 
   const position = boardToWorld(toFile, toRank)
   const target = new THREE.Vector3(position.x, TILE_HEIGHT, position.z)
+  const setPieceBoardPos = (file: number, rank: number) => {
+    const square = squareFromCoords(file, rank)
+    piece.boardPos = { file, rank }
+    piece.root.userData.boardPos = { file, rank }
+    piecesBySquare.set(square, piece)
+  }
   const applyMove = (clipName?: string | null, speedOverride?: number | null) => {
     rotateTowards(piece, target, true)
     const speed =
@@ -349,9 +366,7 @@ export function movePieceEntity(
         ? speedOverride
         : getMoveSpeedForColor(piece.type, piece.color)
     setPieceMove(piece, target, speed)
-    piece.boardPos = { file: toFile, rank: toRank }
-    piece.root.userData.boardPos = { file: toFile, rank: toRank }
-    piecesBySquare.set(toSquare, piece)
+    setPieceBoardPos(toFile, toRank)
     piece.state = 'moving'
     const action = clipName
       ? resolveAction(piece, clipName)
@@ -369,72 +384,135 @@ export function movePieceEntity(
 
   if (options.captureTarget) {
     const victim = options.captureTarget
-    console.log(`${typeToName[piece.type]} attacking ${typeToName[victim.type]}`)
-    piece.state = 'attacking'
-    victim.state = 'dying'
-    const victimPos = victim.root.position
-    rotateTowards(piece, victimPos, true)
-    const attackerPos = piece.root.position
-    rotateTowards(victim, attackerPos, true)
-    if (victim.actions.ready) {
-      transitionAction(victim, victim.actions.ready, { loopOnce: true })
-    }
-    const attackerColor = piece.color === 'w' ? 'white' : 'black'
-    const steps = getAttackSequence(piece.type, victim.type, attackerColor)
-    const { victimEndMs, moveSteps } = scheduleSequence(
-      steps,
-      piece,
-      victim,
-      getMoveSpeedForColor(piece.type, piece.color)
-    )
-    const removalDelay = Math.max(victimEndMs, 300)
-    setTimeout(() => {
-      victim.root.parent?.remove(victim.root)
-      removePieceEntity(victim)
-      piecesById.delete(victim.id)
-    }, removalDelay)
-    if (moveSteps.length === 0) {
-      applyMove()
-    } else {
-      piece.boardPos = { file: toFile, rank: toRank }
-      piece.root.userData.boardPos = { file: toFile, rank: toRank }
-      piecesBySquare.set(toSquare, piece)
-      moveSteps.forEach((step) => {
-        setTimeout(() => {
-          const action = resolveAction(piece, step.clip)
-          const loopOnce = !step.loop
-          const speed =
-            typeof step.speed === 'number'
-              ? step.speed
-              : getMoveSpeedForColor(piece.type, piece.color)
-          if (step.loop) {
-            rotateTowards(piece, target, true)
-          }
-          setPieceMove(piece, target, speed, () => {
-            if (piece.state === 'moving') {
-              finalizeMoveToIdle(piece)
+    const startAttackSequence = () => {
+      console.log(
+        `${typeToName[piece.type]} attacking ${typeToName[victim.type]}`
+      )
+      piece.state = 'attacking'
+      victim.state = 'dying'
+      const victimPos = victim.root.position
+      rotateTowards(piece, victimPos, true)
+      const attackerPos = piece.root.position
+      rotateTowards(victim, attackerPos, true)
+      if (victim.actions.ready) {
+        transitionAction(victim, victim.actions.ready, { loopOnce: true })
+      }
+      const attackerColor = piece.color === 'w' ? 'white' : 'black'
+      const steps = getAttackSequence(piece.type, victim.type, attackerColor)
+      const { victimEndMs, moveSteps } = scheduleSequence(
+        steps,
+        piece,
+        victim,
+        getMoveSpeedForColor(piece.type, piece.color)
+      )
+      const removalDelay = Math.max(victimEndMs, 300)
+      setTimeout(() => {
+        victim.root.parent?.remove(victim.root)
+        removePieceEntity(victim)
+        piecesById.delete(victim.id)
+      }, removalDelay)
+      if (moveSteps.length === 0) {
+        applyMove()
+      } else {
+        setPieceBoardPos(toFile, toRank)
+        moveSteps.forEach((step) => {
+          setTimeout(() => {
+            const action = resolveAction(piece, step.clip)
+            const loopOnce = !step.loop
+            const speed =
+              typeof step.speed === 'number'
+                ? step.speed
+                : getMoveSpeedForColor(piece.type, piece.color)
+            if (step.loop) {
+              rotateTowards(piece, target, true)
             }
-          })
-          piece.state = 'moving'
-          if (action) {
-            transitionAction(piece, action, { loopOnce })
-          }
-          const durationMs = action ? action.getClip().duration * 1000 : 0
-          const token =
-            typeof piece.root.userData.moveToken === 'number'
-              ? (piece.root.userData.moveToken as number) + 1
-              : 1
-          piece.root.userData.moveToken = token
-          if (step.stopAtClipEnd) {
-            setTimeout(() => {
-              if (piece.root.userData.moveToken !== token) return
-              if (piece.state !== 'moving') return
-              stopPieceMove(piece)
-              finalizeMoveToIdle(piece, { resetRotation: false })
-            }, durationMs)
-          }
-        }, step.at)
+            setPieceMove(piece, target, speed, () => {
+              if (piece.state === 'moving') {
+                finalizeMoveToIdle(piece)
+              }
+            })
+            piece.state = 'moving'
+            if (action) {
+              transitionAction(piece, action, { loopOnce })
+            }
+            const durationMs = action ? action.getClip().duration * 1000 : 0
+            const token =
+              typeof piece.root.userData.moveToken === 'number'
+                ? (piece.root.userData.moveToken as number) + 1
+                : 1
+            piece.root.userData.moveToken = token
+            if (step.stopAtClipEnd) {
+              setTimeout(() => {
+                if (piece.root.userData.moveToken !== token) return
+                if (piece.state !== 'moving') return
+                stopPieceMove(piece)
+                finalizeMoveToIdle(piece, { resetRotation: false })
+              }, durationMs)
+            }
+          }, step.at)
+        })
+      }
+    }
+
+    const deltaFile = victim.boardPos.file - piece.boardPos.file
+    const deltaRank = victim.boardPos.rank - piece.boardPos.rank
+    const maxDelta = Math.max(Math.abs(deltaFile), Math.abs(deltaRank))
+    const isAligned =
+      deltaFile === 0 ||
+      deltaRank === 0 ||
+      Math.abs(deltaFile) === Math.abs(deltaRank)
+    const shouldPreMove =
+      slidingAttackers.has(piece.type) &&
+      isAligned &&
+      maxDelta > 1 &&
+      (deltaFile !== 0 || deltaRank !== 0)
+    const startPreMove = () => {
+      if (!shouldPreMove) {
+        startAttackSequence()
+        return
+      }
+      const stepFile = Math.sign(deltaFile)
+      const stepRank = Math.sign(deltaRank)
+      const preFile = toFile - stepFile
+      const preRank = toRank - stepRank
+      const prePosition = boardToWorld(preFile, preRank)
+      const preTarget = new THREE.Vector3(
+        prePosition.x,
+        TILE_HEIGHT,
+        prePosition.z
+      )
+      setPieceBoardPos(preFile, preRank)
+      piece.state = 'moving'
+      rotateTowards(piece, preTarget, true)
+      const walkAction = piece.actions.walk
+      if (walkAction) {
+        transitionAction(piece, walkAction, { loopOnce: false })
+      }
+      const speed = getMoveSpeedForColor(piece.type, piece.color)
+      setPieceMove(piece, preTarget, speed, () => {
+        setPieceBoardPos(toFile, toRank)
+        startAttackSequence()
       })
+    }
+
+    const needsFirstClip =
+      slidingAttackers.has(piece.type) &&
+      piece.root.userData.firstMoveDone !== true
+    if (needsFirstClip) {
+      piece.root.userData.firstMoveDone = true
+      const firstAction = resolveAction(piece, 'first')
+      if (firstAction) {
+        const durationMs = transitionAction(piece, firstAction, {
+          loopOnce: true,
+        })
+        setTimeout(() => {
+          startPreMove()
+        }, durationMs * 1000)
+      } else {
+        startPreMove()
+      }
+    } else {
+      startPreMove()
     }
   } else {
     applyMove()
